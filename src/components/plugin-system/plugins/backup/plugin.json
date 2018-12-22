@@ -1,0 +1,8 @@
+{
+  "id": "backup",
+  "name": "Backup",
+  "icon": "settings_backup_restore",
+  "link": "/backup",
+  "components": {},
+  "settings": []
+}
