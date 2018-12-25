@@ -11,8 +11,10 @@
         </div>
         <q-item>
           <q-btn color="red" style="width: 100%;" v-on:click="debugHomey()" icon="bug_report">&nbsp;&nbsp;Development Debug</q-btn>
-        </q-item><br>
-        <br>
+        </q-item>
+        <q-item v-if="crossRestoreWarning">
+          <q-btn v-if="crossRestoreWarning" color="red" style="width: 100%;" v-on:click="resetCrossRestoreWarning()" icon="bug_report">&nbsp;&nbsp;Warning !! crossRestoreWarning</q-btn>
+        </q-item>
         <div id="tabs" class="container">
             <div class="tabs">
               <a v-on:click="activetab=1" v-bind:class="[ activetab === 1 ? 'active' : '' ]">Backup All</a>
@@ -35,7 +37,7 @@
                       <br>When you restore a flow, missing and / or re-added devices can lead to broken flows.
                       <br><br>Athom does not support this way of backups and restores.<br><br><br>
                       <div id="app-5">
-                        <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+                        <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
                         <q-item>
                           <q-btn color="green" style="width: 100%;" v-on:click="createFullBackUp()" icon="archive">&nbsp;&nbsp;Create Full Backup</q-btn>
                         </q-item>
@@ -50,11 +52,11 @@
                         - Tables with everything<br>
                         - Backup to File<br>
                         - Load restore File<br>
+                        - Beautify Alarms-Repetitions<br>
+                        - ID check on Homeys<br>
                         - <br>
                         <h4>ToDo</h4>
-                        - ID check on Homeys<br>
                         - ID check on existing object<br>
-                        - Beautify Alarms-Repetitions<br>
                         - Path on Zones/Folders<br>
                         - Restore Zones<br>
                         - Restore Devices<br>
@@ -65,7 +67,7 @@
                         - CrossCheck Flows vs Devices<br>
                         - CrossCheck Flows vs Alarms<br>
                         - CrossCheck Flows vs Users<br>
-
+                        <br>
                         <q-item>
                           <q-btn color="black" style="width: 100%;" v-on:click="reloadHomey()" icon="refresh">&nbsp;&nbsp;Reload from {{ homeyName }}</q-btn>
                         </q-item><br>
@@ -527,7 +529,7 @@ export default {
           required: true,
           label: 'Name',
           align: 'left',
-          field: 'name',
+          field: 'id',
           sortable: true,
           classes: 'my-class',
           style: 'width: 500px'
@@ -537,7 +539,7 @@ export default {
           required: false,
           label: 'ID',
           align: 'left',
-          field: 'id',
+          field: '_id',
           sortable: true,
           classes: 'my-class',
           style: 'width: 500px'
@@ -545,6 +547,8 @@ export default {
       ],
       selectedTokensList: [],
 
+      system: [],
+      crossRestoreWarning: false,
       homeyName: 'YourHomey',
       homeyMajorVersion: 0,
       restoreFile: null,
@@ -580,7 +584,8 @@ export default {
       rTokensAr: []
     }
   },
-  mounted () {
+  async mounted () {
+    await this.reloadHomey()
   },
   methods: {
     loadRestoreFile (f) {
@@ -607,11 +612,33 @@ export default {
                   // code block
                   backUpInfo = JSON.parse(content)
                   break
+                case 'system.json':
+                  // code block
+                  this.rSystem = JSON.parse(content)
+                  if (this.rSystem.cloud_id !== this.system.cloud_id) {
+                    this.crossRestoreWarning = true
+                  } else {
+                    if (this.rSystem.cloud_id === this.system.cloud_id) {
+                      this.crossRestoreWarning = false
+                    }
+                  }
+                  break
                 case 'alarms.json':
                   //
                   this.rAlarms = JSON.parse(content)
                   this.rAlarmsAr = Object.values(this.rAlarms)
-                  _(this.rAlarmsAr).forEach(function (alarm) { alarm._repetition = JSON.stringify(alarm.repetition) })
+                  _(this.rAlarmsAr).forEach(function (alarm) {
+                    var thisReps = ''
+                    if (alarm.repetition.monday) { thisReps += 'mon' }
+                    if (alarm.repetition.tuesday) { thisReps += ', tue' }
+                    if (alarm.repetition.wednesday) { thisReps += ', wed' }
+                    if (alarm.repetition.thursday) { thisReps += ', thu' }
+                    if (alarm.repetition.friday) { thisReps += ', fri' }
+                    if (alarm.repetition.saturday) { thisReps += ', sat' }
+                    if (alarm.repetition.sunday) { thisReps += ', sun' }
+                    alarm._repetition = thisReps.replace(/^, /, '') // JSON.stringify(alarm.repetition)
+                    console.log(alarm._repetition)
+                  })
                   break
                 case 'apps.json':
                   this.rApps = JSON.parse(content)
@@ -643,7 +670,7 @@ export default {
                 case 'tokens.json':
                   this.rTokens = JSON.parse(content)
                   this.rTokensAr = Object.values(this.rTokens)
-                  // _(this.rTokensAr).forEach(function (app) { app._name = app.name.en })
+                  _(this.rTokensAr).forEach(function (token) { token._id = token.uri + token.id })
                   break
                 default:
                   // code block
@@ -657,8 +684,12 @@ export default {
         })
       }
     },
+    resetCrossRestoreWarning () {
+      // resetCrossRestoreWarning
+       this.crossRestoreWarning = false
+    },
     handleFileChange1 (ev) {
-      //       var blob = new Blob([zipContents], { type: 'application/zip' })
+      // var blob = new Blob([zipContents], { type: 'application/zip' })
       // var byteArray = new Uint8Array(zipContents)
       // var stringArray = Uint8ToString(byteArray);
       // console.log(flows)
@@ -671,15 +702,15 @@ export default {
     async reloadHomey () {
       var homeyMajorVersion = 2
       // var system = []
-      let system = await this.$homey.system.getInfo()
-      this.homeyName = system.hostname
-      if (!system.homeyVersion && system.homey_version) {
+      this.system = await this.$homey.system.getInfo()
+      this.homeyName = this.system.hostname
+      if (!this.system.homeyVersion && this.system.homey_version) {
         homeyMajorVersion = 1
-        // console.log ( "Version ", homeyMajorVersion, system.homey_version )
+        // console.log ( "Version ", homeyMajorVersion, this.system.homey_version )
       } else {
-        if (system.homeyVersion && !system.homey_version) {
+        if (this.system.homeyVersion && !this.system.homey_version) {
           homeyMajorVersion = 2
-          // console.log ( "Version ", homeyMajorVersion, system.homeyVersion )
+          // console.log ( "Version ", homeyMajorVersion, this.ystem.homeyVersion )
         } else {
           console.log('Error!!', homeyMajorVersion)
         }
@@ -687,7 +718,19 @@ export default {
 
       this.alarms = await this.$homey.alarms.getAlarms()
       this.alarmsAr = Object.values(this.alarms)
-      _(this.alarmsAr).forEach(function (alarm) { alarm._repetition = JSON.stringify(alarm.repetition) })
+      _(this.alarmsAr).forEach(function (alarm) {
+        // create function getAlarmRepetitions () {}
+        var thisReps = ''
+        if (alarm.repetition.monday) { thisReps += 'mon' }
+        if (alarm.repetition.tuesday) { thisReps += ', tue' }
+        if (alarm.repetition.wednesday) { thisReps += ', wed' }
+        if (alarm.repetition.thursday) { thisReps += ', thu' }
+        if (alarm.repetition.friday) { thisReps += ', fri' }
+        if (alarm.repetition.saturday) { thisReps += ', sat' }
+        if (alarm.repetition.sunday) { thisReps += ', sun' }
+        alarm._repetition = thisReps.replace(/^, /, '') // JSON.stringify(alarm.repetition)
+        console.log(alarm._repetition)
+      })
 
       this.apps = await this.$homey.apps.getApps()
       this.appsAr = Object.values(this.apps)
@@ -718,7 +761,7 @@ export default {
       this.foldersAr = Object.values(this.folders)
       // _(this.appsAr).forEach(function (app) { app._name = app.name.en })
       this.tokensAr = Object.values(this.tokens)
-      // _(this.appsAr).forEach(function (app) { app._name = app.name.en })
+      _(this.TokensAr).forEach(function (token) { token._id = token.uri + token.id })
 
       // console.log(JSON.stringify(this.flows))
       // console.log(folders)
@@ -766,43 +809,13 @@ export default {
       })
     },
     async createFullBackUp () {
-      this.message = this.message.split('').reverse().join('')
-      var homeyMajorVersion = 0
-      let system = await this.$homey.system.getInfo()
-
-      if (!system.homeyVersion && system.homey_version) {
-        homeyMajorVersion = 1
-        // console.log ( "Version ", homeyMajorVersion, system.homey_version )
-      } else {
-        if (system.homeyVersion && !system.homey_version) {
-          homeyMajorVersion = 2
-          // console.log ( "Version ", homeyMajorVersion, system.homeyVersion )
-        } else {
-          console.log('Error!!', homeyMajorVersion)
-        }
-      }
-
-      this.flows = await this.$homey.flow.getFlows()
-      this.apps = await this.$homey.apps.getApps()
-      console.log(this.apps)
-      this.zones = await this.$homey.zones.getZones()
-      this.devices = await this.$homey.devices.getDevices()
-      this.alarms = await this.$homey.alarms.getAlarms()
-      if (homeyMajorVersion === 1) {
-        this.folders = await this.$homey.flow.getFolders()
-        this.tokens = await this.$homey.flow.getTokens()
-      } else {
-        this.folders = await this.$homey.flow.getFlowFolders()
-        this.tokens = await this.$homey.flowToken.getFlowTokens()
-      }
-      // console.log(JSON.stringify(this.flows))
-      // console.log(folders)
+      await this.reloadHomey()
 
       var zip = new JSZip()
       zip.file('backUpInfo.json', JSON.stringify({
         backUpDate: new Date(Date.now() - ((new Date()).getTimezoneOffset() * 60000)),
         backUpVersion: 3,
-        homeyName: system.hostname
+        homeyName: this.system.hostname
       }))
       zip.file('system.json', JSON.stringify(this.system))
       zip.file('folders.json', JSON.stringify(this.folders))
@@ -818,7 +831,7 @@ export default {
       var link = document.createElement('a')
       link.href = window.URL.createObjectURL(blob)
       let date = new Date()
-      link.download = system.hostname + '-flow-backup-' + moment(date).format('YYYYMMDD-HH_mm_ss') + '.zip'
+      link.download = this.system.hostname + '-flow-backup-' + moment(date).format('YYYYMMDD-HH_mm_ss') + '.zip'
       document.body.appendChild(link)
       // The actual download
       link.click()
