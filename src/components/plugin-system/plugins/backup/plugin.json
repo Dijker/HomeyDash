@@ -1,6 +1,6 @@
 {
   "id": "backup",
-  "name": "Backup",
+  "name": "Homey Backup and Restore",
   "icon": "settings_backup_restore",
   "link": "/backup",
   "components": {},

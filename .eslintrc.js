@@ -21,7 +21,8 @@ module.exports = {
   globals: {
     'ga': true, // Google Analytics
     'cordova': true,
-    '__statics': true
+    '__statics': true,
+    '_': false  // lodash
   },
   // add your custom rules here
   'rules': {
@@ -42,6 +43,7 @@ module.exports = {
     'import/no-extraneous-dependencies': 0,
 
     // allow debugger during development
-    'no-debugger': process.env.NODE_ENV === 'production' ? 2 : 0
+    'no-debugger': process.env.NODE_ENV === 'production' ? 2 : 0,
+    'vue/html-self-closing': 'off' // Fix v-for/template/key bug
   }
 }

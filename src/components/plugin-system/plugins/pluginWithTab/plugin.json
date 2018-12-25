@@ -1,0 +1,8 @@
+{
+  "id": "pluginWithTab",
+  "name": "PluginWithTab",
+  "icon": "settings_backup_restore",
+  "link": "/pluginWithTab",
+  "components": {},
+  "settings": []
+}
